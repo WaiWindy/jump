@@ -56,7 +56,7 @@
 <body>
 
   <!-- Shop Button -->
-  <button id="shop-btn">🛒 Shop</button>
+  <button id="shop-btn">By Wai</button>
 
   <!-- Leaderboard Button -->
   <button id="leaderboard-btn">📋 Leaderboard</button>
@@ -183,8 +183,18 @@
           }
         }
 
-        fill(plat.goal ? "#FFD700" : "white");
-        rect(plat.x, plat.y, plat.w, plat.h);
+if (plat.goal) {
+  fill("#FFD700");
+  rect(plat.x, plat.y, plat.w, plat.h);
+  textAlign(CENTER, CENTER);
+  textSize(18);
+  fill("white");
+  text("🏁 Finish", plat.x + plat.w / 2, plat.y - 25);
+} else {
+  fill("white");
+  rect(plat.x, plat.y, plat.w, plat.h);
+}
+
       }
 
       player.x = constrain(player.x, 0, width - player.w);
