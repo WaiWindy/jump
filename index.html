@@ -1,3 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Emoji Climb Game</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #mobile-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 20px;
+      z-index: 999;
+    }
+    .btn {
+      background: #333;
+      color: white;
+      font-size: 24px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      user-select: none;
+    }
+    #shop-btn, #leaderboard-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #222;
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 18px;
+      z-index: 1000;
+    }
+    #leaderboard-btn {
+      top: 60px;
+    }
+    #leaderboard {
+      position: fixed;
+      top: 100px;
+      right: 20px;
+      background: rgba(0,0,0,0.9);
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 1001;
       display: none;
     }
   </style>
@@ -51,3 +102,176 @@
           retries++;
         } while (abs(dx) < 80 && retries < 10);
 
+        if (abs(px - lastX) < 30) similarXStreak++; else similarXStreak = 0;
+        if (similarXStreak >= 2) {
+          px = constrain(px + random(80, 150) * (random() > 0.5 ? 1 : -1), 50, width - 150);
+          similarXStreak = 0;
+        }
+
+        let py = lastY - random(60, 100);
+        platforms.push({ x: px, y: py, w: 120, h: 20 });
+        lastX = px; lastY = py;
+      }
+
+      // Goal platform
+      platforms.push({ x: width / 2 - 80, y: lastY - random(80, 100), w: 160, h: 20, goal: true });
+
+      const startPlat = platforms[0];
+      player = {
+        x: startPlat.x + startPlat.w / 2 - 15,
+        y: startPlat.y - 30,
+        vx: 0,
+        vy: 0,
+        w: 30,
+        h: 30,
+        onGround: false
+      };
+      camY = 0;
+      maxHeightReached = 0;
+      stamina = maxStamina;
+      goalReached = false;
+    }
+
+    function draw() {
+      background(20);
+      translate(0, camY);
+
+      if (moveLeft || keyIsDown(LEFT_ARROW) || keyIsDown(65)) player.vx = -5;
+      else if (moveRight || keyIsDown(RIGHT_ARROW) || keyIsDown(68)) player.vx = 5;
+      else player.vx *= friction;
+
+      if ((jump || keyIsDown(UP_ARROW) || keyIsDown(87)) && player.onGround && stamina >= staminaUse && !jumpCooldown) {
+        player.vy = jumpStrength;
+        player.onGround = false;
+        stamina -= staminaUse;
+        jumpCooldown = true;
+        setTimeout(() => jumpCooldown = false, 150);
+      }
+      jump = false;
+
+      player.vy += gravity;
+      player.x += player.vx;
+      player.y += player.vy;
+
+      if (player.y - camY > height + 200) resetPlayer();
+
+      player.onGround = false;
+      for (let plat of platforms) {
+        if (
+          player.y + player.h < plat.y + 5 &&
+          player.y + player.h + player.vy >= plat.y &&
+          player.x + player.w > plat.x &&
+          player.x < plat.x + plat.w
+        ) {
+          player.y = plat.y - player.h;
+          player.vy = 0;
+          player.onGround = true;
+
+          if (plat.goal && !goalReached) {
+            goalReached = true;
+            wins++;
+            localStorage.setItem("wins", wins);
+            setTimeout(() => {
+              if (score > highScore) {
+                highScore = score;
+                localStorage.setItem("highScore", highScore);
+              }
+              sendToLeaderboard(prompt("Name for leaderboard:"), score, wins);
+              generatePlatforms();
+            }, 1000);
+          }
+        }
+
+        fill(plat.goal ? "#FFD700" : "white");
+        rect(plat.x, plat.y, plat.w, plat.h);
+      }
+
+      player.x = constrain(player.x, 0, width - player.w);
+      camY = -player.y + height / 2;
+
+      let currentHeight = -player.y;
+      if (currentHeight > maxHeightReached) {
+        maxHeightReached = currentHeight;
+        score = Math.floor(maxHeightReached);
+      }
+
+      if (player.onGround && stamina < maxStamina) stamina += staminaRegen;
+      stamina = constrain(stamina, 0, maxStamina);
+
+      textSize(30);
+      textAlign(CENTER, CENTER);
+      text(playerEmoji, player.x + player.w / 2, player.y + player.h / 2);
+
+      resetMatrix();
+      fill("white");
+      textSize(20);
+      textAlign(LEFT, TOP);
+      text(`Score: ${score}\nHigh Score: ${highScore}\nWins: ${wins}`, 20, 20);
+
+      fill("lime");
+      rect(20, 110, (stamina / maxStamina) * 100, 10);
+      noFill();
+      stroke("white");
+      rect(20, 110, 100, 10);
+      noStroke();
+
+    }
+
+    function resetPlayer() {
+      const startPlat = platforms[0];
+      player.x = startPlat.x + startPlat.w / 2 - 15;
+      player.y = startPlat.y - 30;
+      player.vx = 0;
+      player.vy = 0;
+      camY = 0;
+      maxHeightReached = 0;
+      stamina = maxStamina;
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+
+    // Submit to leaderboard
+    function sendToLeaderboard(user, points, wins) {
+      fetch(SHEETDB_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: [{ user, points, wins }] })
+      });
+    }
+
+    // Leaderboard button
+    document.getElementById("leaderboard-btn").addEventListener("click", async () => {
+      const box = document.getElementById("leaderboard");
+      if (box.style.display === "block") {
+        box.style.display = "none";
+        return;
+      }
+
+      try {
+        const res = await fetch(SHEETDB_URL);
+        const data = await res.json();
+        const sorted = data.sort((a, b) => b.points - a.points);
+
+        box.innerHTML = "<b>Leaderboard:</b><br><br>" + sorted.slice(0, 10).map(entry =>
+          `${entry.user || "Anonymous"} - 🏆 ${entry.points} pts / 🎉 ${entry.wins} wins`
+        ).join("<br>");
+
+        box.style.display = "block";
+      } catch (e) {
+        box.innerHTML = "Error loading leaderboard.";
+        box.style.display = "block";
+      }
+    });
+
+    // Mobile controls
+    document.getElementById('left').addEventListener('touchstart', () => moveLeft = true);
+    document.getElementById('left').addEventListener('touchend', () => moveLeft = false);
+    document.getElementById('right').addEventListener('touchstart', () => moveRight = true);
+    document.getElementById('right').addEventListener('touchend', () => moveRight = false);
+    document.getElementById('jump').addEventListener('touchstart', () => jump = true);
+    document.getElementById('jump').addEventListener('touchend', () => jump = false);
+  </script>
+</body>
+</html>
