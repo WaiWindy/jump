@@ -1,0 +1,53 @@
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Shop Button -->
+  <button id="shop-btn">🛒 Shop</button>
+
+  <!-- Leaderboard Button -->
+  <button id="leaderboard-btn">📋 Leaderboard</button>
+
+  <!-- Leaderboard Box -->
+  <div id="leaderboard"></div>
+
+  <div id="mobile-controls">
+    <button class="btn" id="left">⬅️</button>
+    <button class="btn" id="jump">⬆️</button>
+    <button class="btn" id="right">➡️</button>
+  </div>
+
+  <script>
+    const SHEETDB_URL = "https://sheetdb.io/api/v1/3zemytjepwi70"; // replace with your SheetDB URL
+
+    let player, gravity = 0.6, jumpStrength = -12, platforms = [], camY = 0;
+    let moveLeft = false, moveRight = false, jump = false;
+    let score = 0, maxHeightReached = 0, highScore = 0, wins = 0;
+    let stamina = 100, maxStamina = 100, staminaRegen = 1, staminaUse = 20;
+    let jumpCooldown = false;
+    const platformCount = 40;
+    let friction = 0.8;
+    let playerEmoji = "😄";
+    let goalReached = false;
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      highScore = +localStorage.getItem("highScore") || 0;
+      wins = +localStorage.getItem("wins") || 0;
+      generatePlatforms();
+    }
+
+    function generatePlatforms() {
+      platforms = [];
+      let lastX = width / 2, lastY = height - 50, similarXStreak = 0;
+
+      for (let i = 0; i < platformCount; i++) {
+        let px, dx, retries = 0;
+        do {
+          dx = random(-150, 150);
+          px = constrain(lastX + dx, 50, width - 150);
+          retries++;
+        } while (abs(dx) < 80 && retries < 10);
+
